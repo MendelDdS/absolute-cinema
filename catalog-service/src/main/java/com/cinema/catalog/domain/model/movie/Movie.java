@@ -10,7 +10,7 @@ public class Movie {
     private final String title;
     private final Duration duration;
 
-    public Movie(MovieId id, String title, Duration duration) {
+    private Movie(MovieId id, String title, Duration duration) {
         if (title == null || title.isBlank()) {
             throw new DomainException("O título do filme é obrigatório");
         }
