@@ -1,0 +1,19 @@
+# Segredos locais (use .env.example como modelo)
+.env
+
+# Build
+target/
+**/.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# SO
+.DS_Store
+
+# Spring Initializr
+HELP.md
