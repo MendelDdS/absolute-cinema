@@ -6,6 +6,8 @@ import java.time.Duration;
 import java.util.Objects;
 
 public class Movie {
+    private static final int MAX_TITLE_LENGTH = 200;
+
     private final MovieId id;
     private final String title;
     private final Duration duration;
@@ -13,6 +15,10 @@ public class Movie {
     private Movie(MovieId id, String title, Duration duration) {
         if (title == null || title.isBlank()) {
             throw new DomainException("O título do filme é obrigatório");
+        }
+        if (title.strip().length() > MAX_TITLE_LENGTH) {
+            throw new DomainException("O título do filme não pode ter mais de %d caracteres"
+                    .formatted(MAX_TITLE_LENGTH));
         }
         if (duration == null || duration.isZero() || duration.isNegative()) {
             throw new DomainException("A duração do filme deve ser maior que zero");

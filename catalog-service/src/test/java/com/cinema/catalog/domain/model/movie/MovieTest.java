@@ -54,4 +54,34 @@ class MovieTest {
 
         assertThat(a).isEqualTo(b);
     }
+
+    @Test
+    @DisplayName("deve aceitar título com exatamente 200 caracteres")
+    void acceptTitleAtMaxLength() {
+        String title = "x".repeat(200);
+
+        Movie movie = Movie.create(title, Duration.ofMinutes(120));
+
+        assertThat(movie.getTitle()).hasSize(200);
+    }
+
+    @Test
+    @DisplayName("deve rejeitar título com mais de 200 caracteres")
+    void rejectsTitleAboveMaxLength() {
+        String title = "x".repeat(201);
+
+        assertThatThrownBy(() -> Movie.create(title, Duration.ofMinutes(120)))
+                .isInstanceOf(DomainException.class)
+                .hasMessageContaining("200");
+    }
+
+    @Test
+    @DisplayName("deve ignorar espaços nas pontas ao validar o tamanho do título")
+    void acceptsMaxLengthTitleWithSurroundingSpaces() {
+        String title = "  " + "x".repeat(200) + "  ";
+
+        Movie movie = Movie.create(title, Duration.ofMinutes(120));
+
+        assertThat(movie.getTitle()).hasSize(200);
+    }
 }
