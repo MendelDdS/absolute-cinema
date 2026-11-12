@@ -2,5 +2,20 @@ spring:
   application:
     name: catalog-service
 
+  # Simplificação local: carrega as variáveis do .env da raiz do projeto.
+  # Em container, as variáveis vêm do ambiente e o arquivo não existe (por isso "optional").
+  config:
+    import: optional:file:../.env[.properties]
+
+  datasource:
+    url: ${CATALOG_DB_URL:jdbc:postgresql://localhost:5433/catalog_db}
+    username: ${CATALOG_DB_USER}
+    password: ${CATALOG_DB_PASSWORD}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
 cinema:
   time-zone: America/Fortaleza
