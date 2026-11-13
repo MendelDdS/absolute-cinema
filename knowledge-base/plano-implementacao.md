@@ -172,7 +172,7 @@ Ordem por fatia:
 - [x] Leitura de filmes e salas reutiliza `MovieRepository`/`RoomRepository` (3.4); `MovieQueryRepository`/`RoomQueryRepository` removidos
 - [x] Aplicação sobe contra o `catalog-db` (Flyway V1–V3 aplicadas, `ddl-auto: validate` ok)
 - [x] Decisão 3.8 aplicada (opção A; services já anotados)
-- [ ] `HexagonalArchitectureTest` (ArchUnit)
+- [x] `HexagonalArchitectureTest` (ArchUnit 1.4.1): domínio só JDK; application só JDK + domain + `stereotype`/`transaction`; adapter.in não usa adapter.out
 
 ### 6.2 Fatia: Filme
 - [ ] `CreateMovieRequest` + `MovieController` (`POST /movies`, `GET /movies`, `GET /movies/{id}`)

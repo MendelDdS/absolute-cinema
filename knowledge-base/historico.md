@@ -58,6 +58,10 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - `LoggingSessionEventPublisher` criado como publicador temporário (`163aa31`).
 - **A aplicação subiu pela primeira vez:** Flyway V1–V3 aplicadas, `ddl-auto: validate` passou, Tomcat na porta 8080.
 - 35 testes unitários passando.
+- `HexagonalArchitectureTest` com ArchUnit 1.4.1. Fecha a seção 6.1 do plano. Contém 3 regras:
+  - o `domain` só depende do JDK;
+  - a `application` só depende do JDK, do `domain` e de `stereotype`/`transaction` do Spring;
+  - `adapter.in` não usa `adapter.out`.
 
 ### Decisões
 - **Repositório de leitura separado só quando o agregado não atende a tela** (plano, 3.4).
@@ -66,6 +70,9 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - **O SQLState `23P01` fica no adapter de persistência.**
   - **Motivo:** traduzir erro técnico em erro de domínio é responsabilidade do adapter. A `application` só conhece `SessionOverlapException`.
   - A constraint `EXCLUDE` é a única proteção contra duas requisições simultâneas, por isso o erro não é "adivinhado": ele é a forma como o banco avisa de uma corrida que a query `findOverlapping` não consegue evitar.
+- **Regras do ArchUnit como lista do que é permitido (`onlyDependOnClassesThat`) para `domain` e `application`.**
+  - **Motivo:** uma lista de proibições só pega o que alguém lembrou de proibir. A lista de permissões pega qualquer dependência nova, como Lombok, Jackson, `@Value` ou `@Autowired`.
+  - Para `adapter.in` a regra é uma proibição, porque o controller pode depender de muita coisa (web, validação). Ela usa `allowEmptyShould(true)` porque o pacote ainda não existe.
 - **`saveAndFlush` em vez de `save`.**
   - **Motivo:** força o INSERT dentro do método, para que a exceção apareça ali, onde pode ser traduzida, e não no commit, fora do adapter.
 
@@ -74,6 +81,11 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - `DataIntegrityViolationException.getMostSpecificCause()` e SQLState.
 - SELECT extra do `merge` quando o ID é atribuído pela aplicação. Correção futura: `Persistable`.
 - Dual write e Transactional Outbox, que vão substituir o publicador em log.
+- ArchUnit:
+  - analisa bytecode, então um import sem uso não conta como dependência;
+  - `pacote..` inclui os subpacotes, e sem o `..` o padrão vale só para o pacote exato (foi a causa de 83 violações falsas na primeira versão);
+  - `DoNotIncludeTests` tira os fakes e o JUnit da análise;
+  - vale ver a regra falhar de propósito, para saber que ela verifica alguma coisa.
 - `git status` com `AM`: parte do arquivo já está no stage. `git diff --cached --stat` mostra o que vai entrar no commit.
 
 ### Problemas e soluções
@@ -86,7 +98,6 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
   - Desfeito com `git reset --mixed` (os commits eram locais e recentes) e refeito, conferindo cada commit com `git diff --cached --stat`.
 
 ### Pendências
-- `HexagonalArchitectureTest` com ArchUnit: último item da seção 6.1.
 - Fatia de Filme (6.2): `MovieController`, `GlobalExceptionHandler` com Problem Details e testes com curl.
 - Asserts extras em `failsWhenRoomNotFound`: tipo `NotFoundException` e nada salvo ou publicado.
 - Validação do tamanho do nome da sala (100), com testes de valor-limite.
