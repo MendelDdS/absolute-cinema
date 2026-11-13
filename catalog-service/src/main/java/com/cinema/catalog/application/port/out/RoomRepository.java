@@ -1,6 +1,5 @@
 package com.cinema.catalog.application.port.out;
 
-import com.cinema.catalog.domain.model.movie.Movie;
 import com.cinema.catalog.domain.model.room.Room;
 import com.cinema.catalog.domain.model.room.RoomId;
 

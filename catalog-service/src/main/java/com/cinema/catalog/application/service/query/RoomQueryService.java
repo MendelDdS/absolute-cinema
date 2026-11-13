@@ -1,7 +1,7 @@
 package com.cinema.catalog.application.service.query;
 
 import com.cinema.catalog.application.port.in.query.RoomQueryUseCase;
-import com.cinema.catalog.application.port.out.query.RoomQueryRepository;
+import com.cinema.catalog.application.port.out.RoomRepository;
 import com.cinema.catalog.application.query.RoomView;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,14 +12,17 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class RoomQueryService implements RoomQueryUseCase {
 
-    private final RoomQueryRepository roomRepository;
+    private final RoomRepository roomRepository;
 
-    public RoomQueryService(RoomQueryRepository roomRepository) {
+    public RoomQueryService(RoomRepository roomRepository) {
         this.roomRepository = roomRepository;
     }
 
     @Override
     public List<RoomView> list() {
-        return roomRepository.findAll();
+        return roomRepository.findAll()
+                .stream()
+                .map(RoomView::from)
+                .toList();
     }
 }
