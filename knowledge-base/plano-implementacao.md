@@ -166,16 +166,18 @@ Ordem por fatia:
 - [x] Casos de uso de escrita e consulta + testes com fakes (incluindo conversão de fuso)
 - [x] Migrations `V1` (movies), `V2` (rooms, room_seats), `V3` (sessions + exclusion constraint)
 - [x] Entidades JPA, repositórios Spring Data, mappers
-- [ ] Adapters de persistência (`Movie`, `Room`, `Session`, `SessionQuery`)
-- [ ] `application.yml` (datasource, `cinema.time-zone`) + `flyway-database-postgresql`
-- [ ] `TimeConfig` (`Clock`, `ZoneId`)
+- [x] Adapters de persistência (`Movie`, `Room`, `Session`, `SessionQuery`)
+- [x] `application.yml` (datasource, `cinema.time-zone`) + `flyway-database-postgresql`
+- [x] `TimeConfig` (`Clock`, `ZoneId`)
+- [x] Leitura de filmes e salas reutiliza `MovieRepository`/`RoomRepository` (3.4); `MovieQueryRepository`/`RoomQueryRepository` removidos
+- [x] Aplicação sobe contra o `catalog-db` (Flyway V1–V3 aplicadas, `ddl-auto: validate` ok)
 - [x] Decisão 3.8 aplicada (opção A; services já anotados)
 - [ ] `HexagonalArchitectureTest` (ArchUnit)
 
 ### 6.2 Fatia: Filme
 - [ ] `CreateMovieRequest` + `MovieController` (`POST /movies`, `GET /movies`, `GET /movies/{id}`)
 - [ ] `GlobalExceptionHandler` (Problem Details)
-- [ ] `LoggingSessionEventPublisher` temporário (para a aplicação subir antes do Outbox)
+- [x] `LoggingSessionEventPublisher` temporário (para a aplicação subir antes do Outbox)
 - [ ] Teste manual com curl (201, 400, 404)
 
 ### 6.3 Fatia: Sala
