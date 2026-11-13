@@ -70,6 +70,10 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
     - 400 para JSON malformado ou sem `durationMinutes`;
     - 400 para UUID inválido;
     - 404 para filme inexistente.
+- Fatia de Sala (6.3): `CreateRoomRequest` e `RoomController` (`POST`, `GET` lista, `GET` por id). Testado com curl. Junto com ela:
+  - nome da sala limitado a 100 caracteres no domínio, com teste escrito antes da correção (sem o limite, o Postgres rejeitaria e o cliente receberia 500);
+  - `RoomQueryUseCase.get` criado para o `Location` do `POST` apontar para um recurso que existe;
+  - testes `RoomQueryServiceTest` e `CreateRoomServiceTest`.
 
 ### Decisões
 - **Repositório de leitura separado só quando o agregado não atende a tela** (plano, 3.4).
@@ -103,6 +107,11 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - `@ExceptionHandler(NotFoundException.class)` também captura as subclasses. Por isso a classe base abstrata permite um único handler de 404 para todos os casos.
 - `POST` responde 201 + `Location` e corpo vazio: um command devolve só o ID.
 - Jackson 3 (Spring Boot 4): `FAIL_ON_NULL_FOR_PRIMITIVES` vem ligado por padrão. Um `int` ausente no JSON vira 400 ("Failed to read request"), e não `0` como no Jackson 2.
+- Qualidade de testes:
+  - o nome da classe de teste deve corresponder à classe testada, porque é a primeira pista quando o teste falha;
+  - valores do cenário não devem coincidir (numa sala 1×1, a capacidade 1 não distingue fileiras de assentos; numa 2×3, o 6 distingue);
+  - um teste de valor-limite usa o primeiro valor inválido (101), não um valor qualquer acima do limite;
+  - o teste com espaços nas pontas que precisa ser **aceito** é o único que prova que o `strip()` acontece antes da contagem.
 - `git status` com `AM`: parte do arquivo já está no stage. `git diff --cached --stat` mostra o que vai entrar no commit.
 
 ### Problemas e soluções
@@ -113,13 +122,15 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - **Primeiro commit da série misturou assuntos.**
   - Versões antigas de alguns arquivos já estavam no stage, e o commit levou junto exclusões que deixavam o código sem compilar.
   - Desfeito com `git reset --mixed` (os commits eram locais e recentes) e refeito, conferindo cada commit com `git diff --cached --stat`.
+- **O mesmo erro se repetiu nos commits da fatia de Sala.**
+  - Causa: o `git diff --cached --stat` rodava no mesmo comando do commit, então a conferência vinha tarde demais.
+  - Correção do processo: esvaziar o stage com `git reset` antes de montar os commits e conferir o stage **antes** de rodar `git commit`, em passos separados.
 
 ### Pendências
-- Fatia de Filme (6.2): `MovieController`, `GlobalExceptionHandler` com Problem Details e testes com curl.
+- Fatia de Sessão (6.4): `ScheduleSessionRequest`, `SessionController` e o handler 409 para `SessionOverlapException`.
 - Asserts extras em `failsWhenRoomNotFound`: tipo `NotFoundException` e nada salvo ou publicado.
-- Validação do tamanho do nome da sala (100), com testes de valor-limite.
-- Renomear `acceptTitleAtMaxLength` para `acceptsTitleAtMaxLength`.
-- Testes faltando: `CreateRoomService` e o caso "não encontrado" de `SessionQueryService.get`.
+- Renomear `acceptTitleAtMaxLength` para `acceptsTitleAtMaxLength` (`MovieTest`).
+- Teste faltando: o caso "não encontrado" de `SessionQueryService.get`.
 - Divergências com o plano:
   - UUID v7;
   - nome `transaction-service` vs `transactions-service`;

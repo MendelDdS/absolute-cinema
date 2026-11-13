@@ -182,8 +182,9 @@ Ordem por fatia:
 - [x] Teste manual com curl (201, 400, 404)
 
 ### 6.3 Fatia: Sala
-- [ ] `CreateRoomRequest` + `RoomController` (`POST /rooms`, `GET /rooms`)
-- [ ] Teste manual
+- [x] `CreateRoomRequest` + `RoomController` (`POST /rooms`, `GET /rooms`, `GET /rooms/{id}`; o `GET` por id foi adicionado para o `Location` do `POST` apontar para um recurso que existe)
+- [x] Teste manual (201, 200, 400 com 27 fileiras e nome > 100, 404)
+- [x] Nome da sala limitado a 100 caracteres no domínio (coluna `VARCHAR(100)`)
 
 ### 6.4 Fatia: Sessão
 - [ ] `ScheduleSessionRequest` + `SessionController` (`POST /sessions`, `GET /sessions?movieId=&date=`, `GET /sessions/{id}`)
