@@ -115,6 +115,7 @@ Testes espelham os pacotes em `src/test/java`.
 - REST, erros em **Problem Details (RFC 9457)** via `GlobalExceptionHandler`:
   validação/`DomainException` → 400, `NotFoundException` → 404, conflitos de negócio → 409.
 - DTOs de request separados dos commands; views podem ser respondidas diretamente.
+- **Validação de entrada: ✅ Decidido — só no domínio** (sem Bean Validation nos requests). Cada regra existe em um lugar só, já testado; custo aceito: erros vêm um por vez. Revisitar (validar também no request) se surgir front-end com formulário ou documentação OpenAPI.
 - `POST` de criação responde `201 Created` + `Location`.
 
 ### 3.8 Anotações na camada `application` — ✅ Decidido: opção A (pragmática)
@@ -175,10 +176,10 @@ Ordem por fatia:
 - [x] `HexagonalArchitectureTest` (ArchUnit 1.4.1): domínio só JDK; application só JDK + domain + `stereotype`/`transaction`; adapter.in não usa adapter.out
 
 ### 6.2 Fatia: Filme
-- [ ] `CreateMovieRequest` + `MovieController` (`POST /movies`, `GET /movies`, `GET /movies/{id}`)
-- [ ] `GlobalExceptionHandler` (Problem Details)
+- [x] `CreateMovieRequest` + `MovieController` (`POST /movies`, `GET /movies`, `GET /movies/{id}`)
+- [x] `GlobalExceptionHandler` (Problem Details; herda `ResponseEntityExceptionHandler` para erros do Spring saírem no mesmo formato)
 - [x] `LoggingSessionEventPublisher` temporário (para a aplicação subir antes do Outbox)
-- [ ] Teste manual com curl (201, 400, 404)
+- [x] Teste manual com curl (201, 400, 404)
 
 ### 6.3 Fatia: Sala
 - [ ] `CreateRoomRequest` + `RoomController` (`POST /rooms`, `GET /rooms`)

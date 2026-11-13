@@ -62,6 +62,14 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
   - o `domain` só depende do JDK;
   - a `application` só depende do JDK, do `domain` e de `stereotype`/`transaction` do Spring;
   - `adapter.in` não usa `adapter.out`.
+- Fatia de Filme (6.2): `CreateMovieRequest`, `MovieController` (`POST`, `GET` lista, `GET` por id) e `GlobalExceptionHandler` com Problem Details.
+  - Testado com curl.
+  - Respostas de sucesso: 201 com `Location`, 200 nos dois `GET`.
+  - Respostas de erro:
+    - 400 vindo do domínio;
+    - 400 para JSON malformado ou sem `durationMinutes`;
+    - 400 para UUID inválido;
+    - 404 para filme inexistente.
 
 ### Decisões
 - **Repositório de leitura separado só quando o agregado não atende a tela** (plano, 3.4).
@@ -73,6 +81,10 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - **Regras do ArchUnit como lista do que é permitido (`onlyDependOnClassesThat`) para `domain` e `application`.**
   - **Motivo:** uma lista de proibições só pega o que alguém lembrou de proibir. A lista de permissões pega qualquer dependência nova, como Lombok, Jackson, `@Value` ou `@Autowired`.
   - Para `adapter.in` a regra é uma proibição, porque o controller pode depender de muita coisa (web, validação). Ela usa `allowEmptyShould(true)` porque o pacote ainda não existe.
+- **Validação da entrada HTTP só no domínio** (plano, 3.7). Não há Bean Validation nos requests.
+  - **Motivo:** a regra fica em um lugar só e já está testada. Com validação também no request, o limite de 200 caracteres ficaria duplicado e poderia divergir.
+  - **Custo aceito:** os erros vêm um de cada vez.
+  - **Quando revisar:** se surgir um front-end com formulário ou documentação OpenAPI.
 - **`saveAndFlush` em vez de `save`.**
   - **Motivo:** força o INSERT dentro do método, para que a exceção apareça ali, onde pode ser traduzida, e não no commit, fora do adapter.
 
@@ -86,6 +98,11 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
   - `pacote..` inclui os subpacotes, e sem o `..` o padrão vale só para o pacote exato (foi a causa de 83 violações falsas na primeira versão);
   - `DoNotIncludeTests` tira os fakes e o JUnit da análise;
   - vale ver a regra falhar de propósito, para saber que ela verifica alguma coisa.
+- Organização por **dono do contrato**, não por quem usa a classe.
+  - Teste para decidir: "se o HTTP fosse trocado por outra entrada, a classe continuaria existindo?" Se sim, ela fica na `application` (`MovieView`, `CreateMovieCommand`). Se não, fica no adapter (`CreateMovieRequest`, `GlobalExceptionHandler`).
+- `@ExceptionHandler(NotFoundException.class)` também captura as subclasses. Por isso a classe base abstrata permite um único handler de 404 para todos os casos.
+- `POST` responde 201 + `Location` e corpo vazio: um command devolve só o ID.
+- Jackson 3 (Spring Boot 4): `FAIL_ON_NULL_FOR_PRIMITIVES` vem ligado por padrão. Um `int` ausente no JSON vira 400 ("Failed to read request"), e não `0` como no Jackson 2.
 - `git status` com `AM`: parte do arquivo já está no stage. `git diff --cached --stat` mostra o que vai entrar no commit.
 
 ### Problemas e soluções
