@@ -18,7 +18,7 @@ class MovieController {
     private final CreateMovieUseCase createMovie;
     private final MovieQueryUseCase movieQuery;
 
-    public MovieController(CreateMovieUseCase createMovie, MovieQueryUseCase movieQuery) {
+    MovieController(CreateMovieUseCase createMovie, MovieQueryUseCase movieQuery) {
         this.createMovie = createMovie;
         this.movieQuery = movieQuery;
     }
@@ -30,14 +30,12 @@ class MovieController {
     }
 
     @GetMapping
-    ResponseEntity<List<MovieView>> list() {
-        List<MovieView> movieList = movieQuery.list();
-        return ResponseEntity.ok(movieList);
+    List<MovieView> list() {
+        return movieQuery.list();
     }
 
     @GetMapping(value = "/{id}")
-    ResponseEntity<MovieView> findMovie(@PathVariable UUID id) {
-        MovieView movie = movieQuery.get(new MovieId(id));
-        return ResponseEntity.ok(movie);
+    MovieView findMovie(@PathVariable UUID id) {
+        return movieQuery.get(new MovieId(id));
     }
 }
