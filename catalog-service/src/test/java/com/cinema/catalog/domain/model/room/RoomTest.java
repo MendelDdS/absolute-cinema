@@ -62,4 +62,34 @@ class RoomTest {
         assertThatThrownBy(() -> room.getSeats().add(new Seat("Z", 99)))
                 .isInstanceOf(UnsupportedOperationException.class);
     }
+
+    @Test
+    @DisplayName("deve aceitar nome com exatamente 100 caracteres")
+    void acceptsNameAtMaxLength() {
+        String name = "A".repeat(100);
+
+        Room room = Room.withGrid(name, 1, 1);
+
+        assertThat(room.getName()).hasSize(100);
+    }
+
+    @Test
+    @DisplayName("deve rejeitar nome com mais de 100 caracteres")
+    void rejectsNameAboveMaxLength() {
+        String name = "   " + "A".repeat(101);
+
+        assertThatThrownBy(() -> Room.withGrid(name, 1, 1))
+                .isInstanceOf(DomainException.class)
+                .hasMessageContaining("100");
+    }
+
+    @Test
+    @DisplayName("deve aceitar nome com 100 caracteres e espaços nas pontas")
+    void acceptsNameAtMaxLengthWithSurroundingSpaces() {
+        String name = "  " + "A".repeat(100) + "  ";
+
+        Room room = Room.withGrid(name, 1, 1);
+
+        assertThat(room.getName()).hasSize(100);
+    }
 }

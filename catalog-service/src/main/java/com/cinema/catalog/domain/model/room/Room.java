@@ -5,6 +5,8 @@ import com.cinema.catalog.domain.exception.DomainException;
 import java.util.*;
 
 public class Room {
+    private static final int MAX_NAME_LENGTH = 100;
+
     private final RoomId id;
     private final String name;
     private final Set<Seat> seats;
@@ -12,6 +14,10 @@ public class Room {
     private Room(RoomId id, String name, List<Seat> seats) {
         if (name == null || name.isBlank()) {
             throw new DomainException("O nome da sala é obrigatório");
+        }
+        if (name.strip().length() > MAX_NAME_LENGTH) {
+            throw new DomainException("O nome da sala não pode ter mais de %d caracteres"
+                    .formatted(MAX_NAME_LENGTH));
         }
         if (seats == null || seats.isEmpty()) {
             throw new DomainException("A sala precisa ter pelo menos um assento");
