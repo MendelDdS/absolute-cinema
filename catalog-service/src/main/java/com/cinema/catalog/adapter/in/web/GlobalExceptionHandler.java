@@ -2,6 +2,7 @@ package com.cinema.catalog.adapter.in.web;
 
 import com.cinema.catalog.application.exception.NotFoundException;
 import com.cinema.catalog.domain.exception.DomainException;
+import com.cinema.catalog.domain.exception.SessionOverlapException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -19,5 +20,10 @@ class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(NotFoundException.class)
     ProblemDetail handleNotFound(NotFoundException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(SessionOverlapException.class)
+    ProblemDetail handleSessionOverlap(SessionOverlapException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
     }
 }
