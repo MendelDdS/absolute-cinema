@@ -115,7 +115,8 @@ Testes espelham os pacotes em `src/test/java`.
 - REST, erros em **Problem Details (RFC 9457)** via `GlobalExceptionHandler`:
   validação/`DomainException` → 400, `NotFoundException` → 404, conflitos de negócio → 409.
 - DTOs de request separados dos commands; views podem ser respondidas diretamente.
-- **Validação de entrada: ✅ Decidido — só no domínio** (sem Bean Validation nos requests). Cada regra existe em um lugar só, já testado; custo aceito: erros vêm um por vez. Revisitar (validar também no request) se surgir front-end com formulário ou documentação OpenAPI.
+- **Validação de entrada: ✅ Decidido — sintaxe no request, semântica no domínio.** Request usa Bean Validation só para presença/formato (`@NotNull` em campos de objeto + `@Valid`), que o `ResponseEntityExceptionHandler` já traduz em 400; regras de negócio (tamanhos, limites, preço não negativo, sobreposição) ficam só no domínio, sem duplicação. Motivo do refinamento (fatia de Sessão): campo de objeto ausente (`UUID`, `BigDecimal`, data) chegava nulo ao `requireNonNull` de `MovieId`/`Money`/command → `NullPointerException` → 500. Filmes e salas não precisam (campos `String` são validados pelo domínio; `int` ausente é rejeitado pelo Jackson 3).
+- **Datas na entrada: ✅ Decidido — ISO 8601 com offset** (`"2026-11-20T19:00:00-03:00"`, `OffsetDateTime` no request → `toInstant()`). Legível na hora local e sem ambiguidade; o adapter não precisa do fuso do cinema. Respostas saem em UTC (`Instant`, sufixo `Z`).
 - `POST` de criação responde `201 Created` + `Location`.
 
 ### 3.8 Anotações na camada `application` — ✅ Decidido: opção A (pragmática)
@@ -187,9 +188,9 @@ Ordem por fatia:
 - [x] Nome da sala limitado a 100 caracteres no domínio (coluna `VARCHAR(100)`)
 
 ### 6.4 Fatia: Sessão
-- [ ] `ScheduleSessionRequest` + `SessionController` (`POST /sessions`, `GET /sessions?movieId=&date=`, `GET /sessions/{id}`)
-- [ ] Tratamento de 409 (sobreposição)
-- [ ] Teste manual
+- [x] `ScheduleSessionRequest` + `SessionController` (`POST /sessions`, `GET /sessions?movieId=&date=`, `GET /sessions/{id}`)
+- [x] Tratamento de 409 (sobreposição)
+- [x] Teste manual (201, 409, borda 21:50 aceita, filtros, 400 de validação/domínio, 404)
 
 ### 6.5 Outbox e Kafka
 - [ ] `V4__create_outbox.sql`

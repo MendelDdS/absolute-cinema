@@ -135,3 +135,46 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
   - UUID v7;
   - nome `transaction-service` vs `transactions-service`;
   - versões das imagens do Testcontainers.
+
+---
+
+## 2026-11-14
+
+### Feito
+- Fatia de Sessão (6.4):
+  - `ScheduleSessionRequest`, com `@NotNull` e `OffsetDateTime`;
+  - `SessionController`, com `POST` com `@Valid`, `GET` com os filtros `date` (obrigatório) e `movieId` (opcional) e `GET` por id;
+  - handler 409 para `SessionOverlapException`.
+- Testado com curl:
+  - 201;
+  - 409 na sobreposição;
+  - **borda aceita**: uma sessão que começa exatamente no fim da anterior é aceita nas três camadas, porque o domínio usa `isBefore` e o `tstzrange` usa `[)`;
+  - 400 sem `date` ("Required parameter 'date' is not present.");
+  - 400 por validação ("Invalid request content.");
+  - 400 do domínio (preço negativo, sessão no passado);
+  - 404.
+
+### Conceitos estudados
+- Uma sessão às 21:50 em Fortaleza (`00:50Z` do dia seguinte) aparece em `GET /sessions?date=<dia local>`, porque o dia é calculado no fuso do cinema.
+- Sem `@Valid`, as anotações do request são ignoradas.
+- `@RequestParam` é obrigatório por padrão e é o equivalente do `@NotNull` para parâmetros de URL.
+- O nulo é tratado em três lugares, cada um com um papel:
+  - o adapter web barra a entrada inválida do cliente (400);
+  - o `requireNonNull` em commands e filtros pega erro de programação (NPE);
+  - o domínio trata as regras de negócio (`DomainException`).
+- Quando dois handlers servem para a mesma exceção, o Spring escolhe o da exceção mais específica (`SessionOverlapException` antes de `DomainException`).
+
+### Decisões
+- **Validação de entrada refinada: sintaxe no request, semântica no domínio** (plano, 3.7).
+  - O request usa `@NotNull` + `@Valid` apenas para verificar se o campo veio.
+  - As regras de negócio continuam só no domínio.
+  - **Motivo:** na fatia de Sessão, campos de objeto ausentes (`UUID`, `BigDecimal`, data) chegavam nulos ao `requireNonNull` e viravam `NullPointerException` → 500.
+  - **Alternativa rejeitada:** mapear `NullPointerException` para 400. Um bug real passaria a parecer erro do cliente.
+- **`startsAt` em ISO 8601 com offset** (`OffsetDateTime` → `toInstant()`).
+  - **Motivo:** quem lê enxerga a hora local, o valor não é ambíguo e o adapter não precisa do fuso do cinema.
+  - **Alternativas:**
+    - UTC puro: fácil errar a conta à mão;
+    - hora local sem offset: ambígua em fusos com horário de verão, e o controller dependeria do fuso.
+
+### Pendências
+- Outbox + Kafka (6.5): substituir o `LoggingSessionEventPublisher`.
