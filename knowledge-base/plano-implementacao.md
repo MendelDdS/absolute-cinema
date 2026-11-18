@@ -110,6 +110,10 @@ Testes espelham os pacotes em `src/test/java`.
 - **Contrato da mensagem separado do evento de domínio** (records em `adapter/out/kafka/message`, tipos simples, datas ISO 8601).
 - Entrega **at-least-once**: header `eventId` (UUID v7) e **consumidores idempotentes** (tabela de eventos processados).
 - `acks: all`; retry + **DLQ** nos consumidores.
+- **Outbox genérico (✅ decidido):** cada linha guarda a mensagem pronta — `id` (eventId), `aggregate_id` (chave Kafka), `topic`, `event_type`, `payload JSONB` (contrato já serializado), `created_at`, `published_at`. O relay não conhece tipos de evento (reutilizável nos outros serviços) e o contrato fica congelado no momento do evento. Produtor com `StringSerializer`; `eventId` e `eventType` em headers.
+- **Relay síncrono, para no primeiro erro (✅ decidido):** `send(...).get(timeout)` e só então marca `published_at`; se falhar, encerra o lote sem lançar exceção (o que já foi enviado fica marcado) e tenta de novo no próximo ciclo — preserva a ordem. `fixedDelay` (sem execuções sobrepostas), lote de 100.
+- **Replicação:** local com 1 nó (`replicas(1)`); em produção, fator 3 + `min.insync.replicas=2` + `acks: all`. Replicação aumenta a disponibilidade do Kafka, mas não substitui o outbox (não cobre queda da aplicação entre o commit e o envio).
+- **`eventId` em UUID v4 por ora (✅ decidido):** igual aos demais IDs; a ordem do relay vem de `created_at`. Migração para v7 continua como pendência geral.
 
 ### 3.7 API
 - REST, erros em **Problem Details (RFC 9457)** via `GlobalExceptionHandler`:
@@ -193,12 +197,12 @@ Ordem por fatia:
 - [x] Teste manual (201, 409, borda 21:50 aceita, filtros, 400 de validação/domínio, 404)
 
 ### 6.5 Outbox e Kafka
-- [ ] `V4__create_outbox.sql`
-- [ ] `OutboxEventJpaEntity`, `OutboxJpaRepository`
-- [ ] `SessionScheduledMessage` (contrato)
-- [ ] `OutboxSessionEventPublisher` (substitui o publisher temporário)
-- [ ] `OutboxRelay` + `KafkaConfig` (`NewTopic`, `@EnableScheduling`)
-- [ ] Verificar evento no Kafka UI
+- [x] `V4__create_outbox.sql`
+- [x] `OutboxEventJpaEntity`, `OutboxJpaRepository`
+- [x] `SessionScheduledMessage` (contrato) + teste unitário do `from`
+- [x] `OutboxSessionEventPublisher` (substitui o publisher temporário)
+- [x] `OutboxRelay` + `KafkaConfig` (`NewTopic`, `@EnableScheduling`)
+- [x] Verificar evento no Kafka UI (chave, headers, payload) e teste de falha (Kafka parado → 201, linha pendente, publicada ao voltar)
 
 ### 6.6 Testes de integração
 - [ ] Base com Testcontainers (`postgres:18-alpine`, Kafka) e `@ServiceConnection`

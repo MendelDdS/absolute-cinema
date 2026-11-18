@@ -175,6 +175,64 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
   - **Alternativas:**
     - UTC puro: fácil errar a conta à mão;
     - hora local sem offset: ambígua em fusos com horário de verão, e o controller dependeria do fuso.
+- **Outbox (plano, 3.6)**:
+  - **Linha genérica com a mensagem pronta** (`topic`, `aggregate_id`, `payload` JSONB).
+    - **Motivo:** o relay serve para qualquer evento, inclusive no `booking-service`, e o contrato fica congelado no momento do evento.
+    - **Alternativa descartada:** o relay conhecer cada tipo de evento e montar a mensagem na hora do envio (um `switch` por tipo).
+  - **Relay síncrono, parando no primeiro erro.**
+    - **Motivo:** só marca o evento como publicado depois da confirmação do Kafka e preserva a ordem.
+    - **Alternativa descartada:** envio assíncrono. Ou perde mensagem (se marcar antes da confirmação), ou complica (o callback roda fora da transação).
+  - **`eventId` em UUID v4.**
+    - **Motivo:** consistência com os outros IDs. O v7 fica para uma migração geral.
 
 ### Pendências
-- Outbox + Kafka (6.5): substituir o `LoggingSessionEventPublisher`.
+- ~~Outbox + Kafka (6.5): substituir o `LoggingSessionEventPublisher`.~~ Feito em 2026-11-18.
+
+---
+
+## 2026-11-18
+
+### Feito
+- Fatia de Outbox e Kafka (6.5):
+  - `V4__create_outbox.sql`, com índice parcial nas linhas pendentes;
+  - `OutboxEventJpaEntity` (payload JSONB via `@JdbcTypeCode(SqlTypes.JSON)` sobre `String`) e `OutboxJpaRepository` (`FOR UPDATE SKIP LOCKED`);
+  - contrato `SessionScheduledMessage` + `SessionScheduledMessageTest`;
+  - `OutboxSessionEventPublisher` grava o evento na mesma transação da sessão; o `LoggingSessionEventPublisher` foi apagado;
+  - `OutboxRelay` (`@Scheduled(fixedDelay = 1000)`, lote de 100, envio síncrono) e `KafkaConfig` (`@EnableScheduling`, tópico `catalog.session.scheduled` com 3 partições).
+- Verificado:
+  - mensagem no tópico com chave = id da sessão e headers `eventId` e `eventType`;
+  - `payload` gravado como objeto JSON no banco (a hipótese do mapeamento `String` → JSONB se confirmou);
+  - **teste de falha:** com o Kafka parado, o `POST` respondeu 201 e a linha ficou com `published_at` nulo; ao subir o Kafka, foi publicada (~50 s depois da criação);
+  - 50 testes passando, incluindo o ArchUnit.
+
+### Conceitos estudados
+- **Dual write:** gravar no banco e publicar no Kafka são duas operações; uma pode falhar sem a outra. O outbox grava o evento na mesma transação da sessão, e o **relay** (retransmissor) leva o evento do banco ao Kafka.
+- **Outbox não é fallback:** todo evento passa pela tabela, sempre. "Salvar só o que falhou" perde o evento se a aplicação cair entre o commit e o envio (o evento só existia na memória), quebra a ordem e cria um caminho de código raramente executado.
+- **Replicação do Kafka complementa, não substitui:** aumenta a disponibilidade do broker, mas não cobre a queda da aplicação.
+- **Polling vs CDC:** o relay consulta o banco a cada 1 s. A alternativa sem polling é CDC (Debezium lendo o log do Postgres), que exige um serviço a mais.
+- **`FOR UPDATE SKIP LOCKED`:** trava as linhas lidas até o fim da transação e faz outra instância pular as travadas, em vez de esperar. A trava é liberada no commit ou no rollback (inclusive se a conexão cair).
+- **Dirty checking:** entidades carregadas dentro da transação ficam gerenciadas; no commit, o Hibernate compara com o estado original e gera o `UPDATE`. Por isso o `markPublished` dispensa `save`. O commit é feito pelo proxy do `@Transactional` quando o método retorna.
+- **Exceções do `Future.get`:** `ExecutionException` e `TimeoutException` são falhas de envio (log e tentar no próximo ciclo); `InterruptedException` é pedido de parada (reativar o sinal com `interrupt()` e sair). Nenhum caminho de erro pode chegar ao `markPublished`.
+- **`JSONB` reordena as chaves** do objeto; em JSON a ordem não tem significado.
+- Nome de tópico em classe de constantes: enum não aceita o ponto no nome e não serve em anotações (`@KafkaListener(topics = ...)`); `application.yaml` é para valores que mudam por ambiente, e o nome do tópico é contrato entre serviços.
+
+### Decisões
+- **Corrigir a V4 editando o arquivo, e não com uma V5.**
+  - **Motivo:** a V4 só tinha rodado no banco local e não estava commitada. A regra "não editar migration aplicada" protege migrations compartilhadas.
+  - **Como:** `DROP TABLE outbox` + `DELETE FROM flyway_schema_history WHERE version = '4'` no banco local.
+  - **Custo:** passo manual. Se a V4 já estivesse no git, a única saída correta seria uma V5.
+- **Limpeza do outbox fica para depois** (plano, seção 10): job que apaga linhas publicadas há mais de alguns dias. Hoje o índice parcial ignora as publicadas e o volume é mínimo.
+
+### Problemas e soluções
+- `Not a managed type: interface ...OutboxJpaRepository`: o primeiro tipo do `JpaRepository<...>` era a própria interface, e não a entidade.
+- Construtor da entidade sem `eventType` e com `publishedAt`, e a chamada do publisher não compilava.
+- V4 sem `event_type` e com `published_at NOT NULL`, já aplicada no banco local: ver a decisão acima.
+- `required a single bean, but 2 were found`: o `LoggingSessionEventPublisher` ainda existia. Apagado.
+- Mensagem "sumida" no Kafka UI: o tópico tinha sido criado como `catolog.session.scheduled` (erro de digitação na constante). Corrigido e o tópico errado apagado.
+- `catch` trocados no relay: um `TimeoutException` marcaria o evento como publicado sem confirmação do Kafka. O teste com o Kafka parado não pegava o bug, porque essa falha chega como `ExecutionException`.
+- `docker compose` precisa rodar na raiz do projeto, onde está o `docker-compose.yml`.
+
+### Pendências
+- 6.6: testes de integração, incluindo "sessão agendada gera mensagem no tópico", concorrência (23P01) e "POST sem campo → 400".
+- Seção 10: limpeza das linhas publicadas do outbox.
+- Pendências antigas: asserts extras em `failsWhenRoomNotFound`; renomear `acceptTitleAtMaxLength`; teste de "não encontrado" em `SessionQueryService.get`; divergências com o plano (UUID v7, nome do `transaction-service`, versões das imagens do Testcontainers).
