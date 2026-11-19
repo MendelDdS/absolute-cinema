@@ -251,6 +251,7 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - 56 testes passando. Os containers sobem uma vez só na execução inteira.
 - Seção 7 planejada: fatias 7.0 a 7.6 e decisões da 7.1 registradas no plano.
 - 7.0 (booking): `application.yaml` com `.env`, banco 5434, Kafka e porta 8081; configuração de execução no IntelliJ. A aplicação sobe.
+- 7.1, domínio da projeção: `Session` (`register`/`restore`), `SessionId`, `SeatCode` (regex `[A-Z][1-9][0-9]*`), cópias de `Money` e `DomainException`. 17 testes no booking (`SeatCodeTest` parametrizado com `@ValueSource` e `@NullAndEmptySource`).
 
 ### Conceitos estudados
 - **Cache de contexto do Spring:** classes de teste com configuração idêntica reaproveitam o mesmo contexto (e os mesmos containers). Uma anotação a mais em uma classe cria outro contexto. Por isso a configuração fica toda na classe base, inclusive o `@AutoConfigureMockMvc`.
@@ -260,6 +261,8 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
   - rollback com `@Transactional` não serve, porque o relay roda em outra thread e o teste da constraint precisa de commits reais.
 - **Teste de concorrência determinístico:** com duas threads não se controla quem chega primeiro, e o teste poderia passar pela verificação do service sem tocar na constraint. Chamar a porta com `Session.restore` isola a última linha de defesa.
 - **Problem Details:** o campo `detail` está em toda resposta de erro deste projeto, porque o handler herda de `ResponseEntityExceptionHandler`. `$.detail` é JsonPath (`$` = raiz).
+- **Dado de teste escolhido de propósito:** com os assentos `A1..A4`, um `HashSet` também devolve a ordem certa (conferido), então o teste não provava o `LinkedHashSet`. Com `B1` primeiro, prova. Do mesmo jeito, `hasMessageContaining` garante qual regra lançou a `DomainException`: sem ela, um `SeatCode` inválido no próprio teste o faria passar.
+- **`Clock.fixed` só serve quando é injetado no código testado.** A `Session` do booking não recebe `Clock`, então o teste usa uma constante `Instant`.
 - **Awaitility:** repete uma asserção até passar ou estourar o tempo; serve para resultados assíncronos (relay a cada 1 s) no lugar de `Thread.sleep`.
 - Um UUID malformado no JSON dá 400 ("Failed to read request") antes de chegar ao service. Para testar 404, o ID precisa ser válido e inexistente (`UUID.randomUUID()`).
 
@@ -268,6 +271,7 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - **`MockMvcTester` em vez de servidor HTTP real:** exercita a pilha inteira do Spring MVC, sem porta de rede; para esta API, o servidor real acrescentaria pouco.
 - **Booking sem biblioteca compartilhada com o catalog:** `Money`, `DomainException` e o contrato da mensagem são copiados. Uma lib comum acoplaria versões e deploys dos serviços; o custo é duplicar classes pequenas.
 - **Projeção mínima e imutável no booking, inbox para idempotência, retry + DLQ:** motivos no plano, seção 7.
+- **Ordem da 7.1 trocada: persistência (Parte 2) antes do caso de uso (Parte 3).** Um `@Service` que depende de uma porta sem implementação impede o contexto do Spring de subir e quebraria o `BookingServiceApplicationTests`. A tabela `processed_events` foi para a Parte 4, junto com o consumer, que é quem a usa.
 - **Aviso do Mockito ("self-attaching") ignorado por ora:** é só um aviso, no Java 25 tudo funciona. A correção (Mockito como `-javaagent` no surefire) exige configuração extra para o IntelliJ.
 
 ### Problemas e soluções
@@ -277,7 +281,7 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - Booking falhou com `password authentication failed for user "${BOOKING_DB_USER}"`: a configuração de execução nova estava com o Working directory padrão. Com `$MODULE_WORKING_DIR$`, o `../.env` é encontrado. Mesmo problema da configuração do catalog: toda configuração nova precisa desse ajuste.
 
 ### Pendências
-- 7.1 (booking): domínio da projeção em revisão; depois, Partes 2 a 4 (caso de uso, persistência, consumer).
+- 7.1 (booking): Parte 2 (persistência + ArchUnit), Parte 3 (caso de uso `RegisterSession` com fake), Parte 4 (consumer com inbox, retry e DLQ).
 - Seção 10: limpeza das linhas publicadas do outbox.
 - Aviso do Mockito sobre carregamento dinâmico de agente: configurar `-javaagent` no surefire antes de uma versão do JDK que bloqueie agentes dinâmicos.
 - Testes de integração de filmes e salas (só sessões têm, por enquanto), se valer a pena.
