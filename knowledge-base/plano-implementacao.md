@@ -214,6 +214,25 @@ Ordem por fatia:
 
 ## 7. `booking-service`
 
+### Fatias (✅ decidido)
+Cada fatia usa a anterior:
+1. **7.0 Preparação ✅:** `application.yaml` (porta 8081, banco 5434, Kafka), configuração de execução no IntelliJ.
+2. **7.1 Projeção de sessões:** consumer de `SessionScheduled` → `sessions` + `session_seats`, idempotente (inbox), retry + DLQ.
+3. **7.2 Reserva (hold):** agregado `Booking`, `POST /bookings`, garantia no banco, 409, teste de concorrência.
+4. **7.3 Mapa de assentos:** `GET /sessions/{id}/seats` com status.
+5. **7.4 Expiração de holds:** job com `Clock`.
+6. **7.5 Cancelamento:** `DELETE /bookings/{id}`.
+7. **7.6 Pagamento:** `POST /bookings/{id}/payment` → `PaymentRequested` via outbox; consumer de `PaymentApproved/Rejected` → `CONFIRMED`/`CANCELLED` + `BookingConfirmed`.
+
+### Decisões da 7.1 (✅ decidido)
+- **Sem biblioteca compartilhada entre serviços:** o booking tem a sua própria cópia de `Money`, `DomainException` e do contrato da mensagem. Uma lib comum acoplaria versões e deploys; o custo é duplicar classes pequenas.
+- **Projeção mínima:** só o que o booking usa (`id`, `starts_at`, `price`, assentos). Se um dia precisar de mais campos, será preciso reprocessar eventos.
+- **Assentos em tabela própria (`session_seats`)**, não em array: as reservas (7.2) terão chave estrangeira para ela, então o banco garante que só se reserva assento que existe.
+- **Projeção imutável:** escrita só pelo consumer. O status do assento (livre, reservado) é derivado das reservas, não guardado na projeção — uma única fonte de verdade.
+- **Idempotência com tabela `processed_events` (padrão Inbox)** no adapter de entrada Kafka, na mesma transação do efeito. O `eventId` é conceito de mensageria, então fica fora da `application`; o inbox mora em `adapter/in/kafka`, simétrico ao outbox em `adapter/out/outbox`.
+- **Consumir como `String` e converter com `JsonMapper` no listener:** erro de JSON vira exceção no listener e segue o mesmo caminho de retry/DLQ que qualquer outra falha.
+- **Retry + DLQ:** algumas tentativas com intervalo; depois, a mensagem vai para `catalog.session.scheduled.dlq`, criado pelo booking (quem produz no tópico o cria).
+
 ### Domínio
 - `Booking` (agregado): `HELD` → `PAYMENT_PENDING` → `CONFIRMED`; `HELD` → `EXPIRED`; `PAYMENT_PENDING` → `CANCELLED`; `HELD` → `CANCELLED`
 - `SeatHold` / reserva de assento com prazo de expiração

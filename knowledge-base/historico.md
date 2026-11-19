@@ -249,6 +249,8 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
   - `OutboxRelayIntegrationTest`: a sessão agendada chega ao tópico com a chave, o header `eventType` e o payload.
 - Imagens do Testcontainers fixadas em `postgres:18-alpine` e `apache/kafka:4.4.0` (as mesmas do compose) nos quatro serviços.
 - 56 testes passando. Os containers sobem uma vez só na execução inteira.
+- Seção 7 planejada: fatias 7.0 a 7.6 e decisões da 7.1 registradas no plano.
+- 7.0 (booking): `application.yaml` com `.env`, banco 5434, Kafka e porta 8081; configuração de execução no IntelliJ. A aplicação sobe.
 
 ### Conceitos estudados
 - **Cache de contexto do Spring:** classes de teste com configuração idêntica reaproveitam o mesmo contexto (e os mesmos containers). Uma anotação a mais em uma classe cria outro contexto. Por isso a configuração fica toda na classe base, inclusive o `@AutoConfigureMockMvc`.
@@ -264,15 +266,18 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 ### Decisões
 - **Imagens fixas e iguais às do compose:** com `latest`, os testes mudariam de versão sozinhos.
 - **`MockMvcTester` em vez de servidor HTTP real:** exercita a pilha inteira do Spring MVC, sem porta de rede; para esta API, o servidor real acrescentaria pouco.
+- **Booking sem biblioteca compartilhada com o catalog:** `Money`, `DomainException` e o contrato da mensagem são copiados. Uma lib comum acoplaria versões e deploys dos serviços; o custo é duplicar classes pequenas.
+- **Projeção mínima e imutável no booking, inbox para idempotência, retry + DLQ:** motivos no plano, seção 7.
 - **Aviso do Mockito ("self-attaching") ignorado por ora:** é só um aviso, no Java 25 tudo funciona. A correção (Mockito como `-javaagent` no surefire) exige configuração extra para o IntelliJ.
 
 ### Problemas e soluções
 - `returnsNotFoundForUnknownMovie` recebia 400: `"000000-000000-000000"` não é UUID válido. Trocado por `UUID.randomUUID()`.
 - `ticket-service` não compilava (string da imagem cortada). Corrigido.
 - Contagem de testes errada desde a 6.5 (relatório antigo do surefire somado).
+- Booking falhou com `password authentication failed for user "${BOOKING_DB_USER}"`: a configuração de execução nova estava com o Working directory padrão. Com `$MODULE_WORKING_DIR$`, o `../.env` é encontrado. Mesmo problema da configuração do catalog: toda configuração nova precisa desse ajuste.
 
 ### Pendências
-- Seção 7: `booking-service`.
+- 7.1 (booking): domínio da projeção em revisão; depois, Partes 2 a 4 (caso de uso, persistência, consumer).
 - Seção 10: limpeza das linhas publicadas do outbox.
 - Aviso do Mockito sobre carregamento dinâmico de agente: configurar `-javaagent` no surefire antes de uma versão do JDK que bloqueie agentes dinâmicos.
 - Testes de integração de filmes e salas (só sessões têm, por enquanto), se valer a pena.
