@@ -205,10 +205,10 @@ Ordem por fatia:
 - [x] Verificar evento no Kafka UI (chave, headers, payload) e teste de falha (Kafka parado → 201, linha pendente, publicada ao voltar)
 
 ### 6.6 Testes de integração
-- [ ] Base com Testcontainers (`postgres:18-alpine`, Kafka) e `@ServiceConnection`
-- [ ] Persistência: constraint de sobreposição em concorrência → `SessionOverlapException`
-- [ ] Web: endpoints e códigos de erro
-- [ ] Outbox: sessão agendada gera mensagem no tópico
+- [x] Base com Testcontainers (`postgres:18-alpine`, `apache/kafka:4.4.0`, iguais ao compose) e `@ServiceConnection`; classe `IntegrationTest` (um contexto só, `TRUNCATE` antes de cada teste)
+- [x] Persistência: constraint de sobreposição → `SessionOverlapException` (determinístico, chamando a porta com `Session.restore`, sem threads) + borda `[)` aceita
+- [x] Web: sessões (201 + `Location`, 400 por campo ausente, 409, 404, 400 sem `date`)
+- [x] Outbox: sessão agendada gera mensagem no tópico (chave, header `eventType`, payload)
 
 ---
 

@@ -203,7 +203,7 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
   - mensagem no tópico com chave = id da sessão e headers `eventId` e `eventType`;
   - `payload` gravado como objeto JSON no banco (a hipótese do mapeamento `String` → JSONB se confirmou);
   - **teste de falha:** com o Kafka parado, o `POST` respondeu 201 e a linha ficou com `published_at` nulo; ao subir o Kafka, foi publicada (~50 s depois da criação);
-  - 50 testes passando, incluindo o ArchUnit.
+  - 48 testes passando, incluindo o ArchUnit. (Na hora foi informado "50": a soma incluía um relatório antigo do surefire.)
 
 ### Conceitos estudados
 - **Dual write:** gravar no banco e publicar no Kafka são duas operações; uma pode falhar sem a outra. O outbox grava o evento na mesma transação da sessão, e o **relay** (retransmissor) leva o evento do banco ao Kafka.
@@ -235,4 +235,45 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 ### Pendências
 - 6.6: testes de integração, incluindo "sessão agendada gera mensagem no tópico", concorrência (23P01) e "POST sem campo → 400".
 - Seção 10: limpeza das linhas publicadas do outbox.
-- Pendências antigas: asserts extras em `failsWhenRoomNotFound`; renomear `acceptTitleAtMaxLength`; teste de "não encontrado" em `SessionQueryService.get`; divergências com o plano (UUID v7, nome do `transaction-service`, versões das imagens do Testcontainers).
+- Pendências antigas: asserts extras em `failsWhenRoomNotFound`; renomear `acceptTitleAtMaxLength`; teste de "não encontrado" em `SessionQueryService.get`; divergências com o plano (UUID v7, nome do `transaction-service`, ~~versões das imagens do Testcontainers~~ feito em 2026-11-19).
+
+---
+
+## 2026-11-19
+
+### Feito
+- Testes de integração (6.6) no catalog:
+  - `IntegrationTest`: classe base com `@SpringBootTest`, `@AutoConfigureMockMvc` e os containers, e `TRUNCATE` das tabelas antes de cada teste;
+  - `SessionPersistenceAdapterIntegrationTest`: a constraint `EXCLUDE` rejeita sobreposição (traduzida para `SessionOverlapException`) e aceita sessões encostadas;
+  - `SessionControllerIntegrationTest` com `MockMvcTester`: 201 + `Location`, 400 por campo ausente, 409, 404 e 400 sem `date`;
+  - `OutboxRelayIntegrationTest`: a sessão agendada chega ao tópico com a chave, o header `eventType` e o payload.
+- Imagens do Testcontainers fixadas em `postgres:18-alpine` e `apache/kafka:4.4.0` (as mesmas do compose) nos quatro serviços.
+- 56 testes passando. Os containers sobem uma vez só na execução inteira.
+
+### Conceitos estudados
+- **Cache de contexto do Spring:** classes de teste com configuração idêntica reaproveitam o mesmo contexto (e os mesmos containers). Uma anotação a mais em uma classe cria outro contexto. Por isso a configuração fica toda na classe base, inclusive o `@AutoConfigureMockMvc`.
+- **Isolamento por `TRUNCATE` no `@BeforeEach`:**
+  - o banco é compartilhado entre os testes e o JUnit não garante a ordem, então cada teste começa limpo;
+  - o lixo do último teste some com o container;
+  - rollback com `@Transactional` não serve, porque o relay roda em outra thread e o teste da constraint precisa de commits reais.
+- **Teste de concorrência determinístico:** com duas threads não se controla quem chega primeiro, e o teste poderia passar pela verificação do service sem tocar na constraint. Chamar a porta com `Session.restore` isola a última linha de defesa.
+- **Problem Details:** o campo `detail` está em toda resposta de erro deste projeto, porque o handler herda de `ResponseEntityExceptionHandler`. `$.detail` é JsonPath (`$` = raiz).
+- **Awaitility:** repete uma asserção até passar ou estourar o tempo; serve para resultados assíncronos (relay a cada 1 s) no lugar de `Thread.sleep`.
+- Um UUID malformado no JSON dá 400 ("Failed to read request") antes de chegar ao service. Para testar 404, o ID precisa ser válido e inexistente (`UUID.randomUUID()`).
+
+### Decisões
+- **Imagens fixas e iguais às do compose:** com `latest`, os testes mudariam de versão sozinhos.
+- **`MockMvcTester` em vez de servidor HTTP real:** exercita a pilha inteira do Spring MVC, sem porta de rede; para esta API, o servidor real acrescentaria pouco.
+- **Aviso do Mockito ("self-attaching") ignorado por ora:** é só um aviso, no Java 25 tudo funciona. A correção (Mockito como `-javaagent` no surefire) exige configuração extra para o IntelliJ.
+
+### Problemas e soluções
+- `returnsNotFoundForUnknownMovie` recebia 400: `"000000-000000-000000"` não é UUID válido. Trocado por `UUID.randomUUID()`.
+- `ticket-service` não compilava (string da imagem cortada). Corrigido.
+- Contagem de testes errada desde a 6.5 (relatório antigo do surefire somado).
+
+### Pendências
+- Seção 7: `booking-service`.
+- Seção 10: limpeza das linhas publicadas do outbox.
+- Aviso do Mockito sobre carregamento dinâmico de agente: configurar `-javaagent` no surefire antes de uma versão do JDK que bloqueie agentes dinâmicos.
+- Testes de integração de filmes e salas (só sessões têm, por enquanto), se valer a pena.
+- Pendências antigas: asserts extras em `failsWhenRoomNotFound`; renomear `acceptTitleAtMaxLength`; teste de "não encontrado" em `SessionQueryService.get`; UUID v7; nome do `transaction-service`.
