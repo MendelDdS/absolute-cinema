@@ -11,14 +11,14 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 ### Feito
 - Leitura do projeto e criação do repositório Git (`.gitignore`, `.env.example`). O `.env` com as credenciais fica fora do Git.
 - Revisão dos testes da `application`. O pacote foi trocado de `RuntimeException` genérica para exceções próprias.
-- Construtor de `Movie` tornado privado: a criação passa por `create`/`restore`, como em `Room` e `Session` (`455d18a`).
-- Tabela `rooms_seats` corrigida para `room_seats` na V2 (`2201e99`).
-- `application.yaml` configurado (`5208893`):
+- Construtor de `Movie` tornado privado: a criação passa por `create`/`restore`, como em `Room` e `Session` (`f3fd886`).
+- Tabela `rooms_seats` corrigida para `room_seats` na V2 (`68c3ea9`).
+- `application.yaml` configurado (`42f57ce`):
   - datasource via variáveis de ambiente;
   - `.env` importado com `spring.config.import`;
   - `ddl-auto: validate`;
   - `open-in-view: false`.
-- Validação do tamanho máximo do título do filme (200) no domínio, com testes de valor-limite (`cb99d80`).
+- Validação do tamanho máximo do título do filme (200) no domínio, com testes de valor-limite (`54668fa`).
 
 ### Decisões
 - **Anotações do Spring na `application` (plano, 3.8): opção A.** `@Service` e `@Transactional` ficam nos services.
@@ -49,13 +49,13 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 ## 2026-11-13
 
 ### Feito
-- `SessionPersistenceAdapter` implementado (`053ba51`): `saveAndFlush` mais a tradução do SQLState `23P01` para `SessionOverlapException`.
-- `SessionQueryPersistenceAdapter` implementado, com projeções JPQL que juntam sessão, filme e sala (`053ba51`).
-- Portas `MovieQueryRepository` e `RoomQueryRepository` removidas (`8f18f82`):
+- `SessionPersistenceAdapter` implementado (`8d7277f`): `saveAndFlush` mais a tradução do SQLState `23P01` para `SessionOverlapException`.
+- `SessionQueryPersistenceAdapter` implementado, com projeções JPQL que juntam sessão, filme e sala (`8d7277f`).
+- Portas `MovieQueryRepository` e `RoomQueryRepository` removidas (`88b735d`):
   - a leitura de filmes e salas passa a usar `MovieRepository`/`RoomRepository` com `View.from`;
   - campo de `RoomView` renomeado de `title` para `name`;
   - criado `MovieQueryServiceTest`.
-- `LoggingSessionEventPublisher` criado como publicador temporário (`163aa31`).
+- `LoggingSessionEventPublisher` criado como publicador temporário (`c8ee63f`).
 - **A aplicação subiu pela primeira vez:** Flyway V1–V3 aplicadas, `ddl-auto: validate` passou, Tomcat na porta 8080.
 - 35 testes unitários passando.
 - `HexagonalArchitectureTest` com ArchUnit 1.4.1. Fecha a seção 6.1 do plano. Contém 3 regras:
