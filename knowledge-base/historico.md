@@ -295,7 +295,8 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
   - `V1__create_sessions.sql`: `sessions` e `session_seats` (PK `(session_id, seat_code)`, `UNIQUE (session_id, seat_order)`, `CHECK` com a mesma regex do `SeatCode`);
   - `SessionJpaEntity` com `@ElementCollection` + `@OrderColumn(name = "seat_order")`, `SessionJpaRepository` com `@EntityGraph` no `findById`, `SessionPersistenceMapper` e `SessionPersistenceAdapter`;
   - testes: classe base `IntegrationTest`, `SessionPersistenceAdapterIntegrationTest` (ordem B1, A1, A2 preservada após ida e volta ao banco) e `HexagonalArchitectureTest` com ArchUnit.
-- 21 testes passando no booking.
+- 7.1, Parte 3 (caso de uso): `RegisterSessionUseCase` + `RegisterSessionCommand`, `RegisterSessionService` e o fake `InMemorySessionRepository`. Teste escrito antes, visto falhando com o service vazio, depois implementado.
+- 24 testes passando no booking.
 
 ### Conceitos estudados
 - **Proxy CGLIB e construtor visível:** o `@Repository` faz o Spring envolver o bean em um proxy de tradução de exceções. Esse proxy é uma subclasse gerada em tempo de execução e precisa chamar o construtor da classe-mãe; com o construtor `private`, o contexto não sobe ("No visible constructors"). Construtor privado é padrão do domínio; adapter é instanciado pelo Spring e precisa de construtor `public`.
@@ -305,11 +306,17 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
   - As invariantes estruturais ficam no construtor privado e valem nos dois caminhos. Dois construtores não resolvem, porque as assinaturas podem ser iguais; o nome do *factory method* carrega a intenção (Bloch, *Effective Java*, item 1).
   - Na hexagonal, o `restore` é a porta oficial do adapter de persistência para montar o agregado, sem deixar um construtor público para qualquer camada.
   - No booking os dois corpos ainda são iguais (o ID vem do evento): a separação segue o modelo do catalog, onde a diferença já existe.
+- **Teste visto falhando antes da implementação:** o service começa com o corpo vazio, que compila; os testes falham pelo motivo certo (nada salvo, nenhuma exceção). Isso prova que eles conseguem pegar o erro.
+- **Assento inválido no meio da lista** (`B1`, `a1`, `A2`): prova que um código inválido derruba a sessão inteira, e o `count()` do fake (método só do fake, fora da porta) prova que nada foi salvo.
 - **ArchUnit com pacote vazio:** uma regra cujo `that()` não encontra nenhuma classe falha ("failed to check any classes"). Foi o que denunciou o teste copiado do catalog ainda apontando para `com.cinema.catalog`.
 
 ### Decisões
 - **Tabela `session_seats`** (igual ao `room_seats` do catalog). A V1 já tinha sido aplicada com outro nome no banco local; o banco foi recriado antes da troca, então o checksum do Flyway confere.
 - **Mapper usa `Session.restore`:** ler do banco é reconstituir, não registrar uma sessão nova.
+- **Command com tipos do JDK (`UUID`, `Instant`, `BigDecimal`, `List<String>`):** a conversão para objetos de valor fica só no service, então dado inválido sempre vira `DomainException` no mesmo ponto; o listener (Parte 4) só traduz o formato de transporte. Mesmo padrão do `CreateRoomCommand` do catalog.
+- **`register` retorna `void`:** quem chama é o consumer, que já tem o ID vindo no evento.
+- **Sem checar "sessão já existe" no service:** o catalog publica cada sessão uma vez, com `eventId` único; reentregas trazem o mesmo `eventId` e o inbox da Parte 4 as descarta. Checar com `findById` custaria uma leitura por evento para duplicar essa garantia.
+- **`seatCodes` no command, mesmo nome do campo da mensagem do catalog:** a conversão no listener fica um mapeamento direto, sem tradução de nomes.
 
 ### Problemas e soluções
 - Contexto não subia: construtor `private` no `SessionPersistenceAdapter`. Trocado para `public`.
@@ -317,7 +324,7 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - Testes de integração com "Could not find a valid Docker environment": o Docker Desktop estava fechado.
 
 ### Pendências
-- 7.1 (booking): Parte 3 (caso de uso `RegisterSession` com fake), Parte 4 (consumer com inbox, retry e DLQ).
+- 7.1 (booking): Parte 4 (consumer de `SessionScheduled` com inbox `processed_events`, retry e DLQ).
 - Exercício `returnsEmptyForUnknownSession` no `SessionPersistenceAdapterIntegrationTest`.
 - Seção 10: limpeza das linhas publicadas do outbox.
 - Aviso do Mockito sobre carregamento dinâmico de agente: configurar `-javaagent` no surefire.
