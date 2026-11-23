@@ -286,3 +286,40 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - Aviso do Mockito sobre carregamento dinâmico de agente: configurar `-javaagent` no surefire antes de uma versão do JDK que bloqueie agentes dinâmicos.
 - Testes de integração de filmes e salas (só sessões têm, por enquanto), se valer a pena.
 - Pendências antigas: asserts extras em `failsWhenRoomNotFound`; renomear `acceptTitleAtMaxLength`; teste de "não encontrado" em `SessionQueryService.get`; UUID v7; nome do `transaction-service`.
+
+## 2026-11-23
+
+### Feito
+- 7.1, Parte 2 (persistência da projeção no booking):
+  - porta `SessionRepository` (`save`, `findById`);
+  - `V1__create_sessions.sql`: `sessions` e `session_seats` (PK `(session_id, seat_code)`, `UNIQUE (session_id, seat_order)`, `CHECK` com a mesma regex do `SeatCode`);
+  - `SessionJpaEntity` com `@ElementCollection` + `@OrderColumn(name = "seat_order")`, `SessionJpaRepository` com `@EntityGraph` no `findById`, `SessionPersistenceMapper` e `SessionPersistenceAdapter`;
+  - testes: classe base `IntegrationTest`, `SessionPersistenceAdapterIntegrationTest` (ordem B1, A1, A2 preservada após ida e volta ao banco) e `HexagonalArchitectureTest` com ArchUnit.
+- 21 testes passando no booking.
+
+### Conceitos estudados
+- **Proxy CGLIB e construtor visível:** o `@Repository` faz o Spring envolver o bean em um proxy de tradução de exceções. Esse proxy é uma subclasse gerada em tempo de execução e precisa chamar o construtor da classe-mãe; com o construtor `private`, o contexto não sobe ("No visible constructors"). Construtor privado é padrão do domínio; adapter é instanciado pelo Spring e precisa de construtor `public`.
+- **`register`/`create` × `restore` (criação × reconstituição):** criar e reconstituir são momentos diferentes do ciclo de vida do agregado (Evans, *Domain-Driven Design*, cap. 6, "Reconstituting Stored Objects").
+  - A criação gera a identidade e aplica regras e efeitos que só valem no nascimento (data no futuro, evento de domínio).
+  - A reconstituição preserva o ID salvo e não reaplica essas regras: uma sessão já exibida violaria "começa no futuro" e deixaria de carregar; um evento de criação seria republicado a cada leitura.
+  - As invariantes estruturais ficam no construtor privado e valem nos dois caminhos. Dois construtores não resolvem, porque as assinaturas podem ser iguais; o nome do *factory method* carrega a intenção (Bloch, *Effective Java*, item 1).
+  - Na hexagonal, o `restore` é a porta oficial do adapter de persistência para montar o agregado, sem deixar um construtor público para qualquer camada.
+  - No booking os dois corpos ainda são iguais (o ID vem do evento): a separação segue o modelo do catalog, onde a diferença já existe.
+- **ArchUnit com pacote vazio:** uma regra cujo `that()` não encontra nenhuma classe falha ("failed to check any classes"). Foi o que denunciou o teste copiado do catalog ainda apontando para `com.cinema.catalog`.
+
+### Decisões
+- **Tabela `session_seats`** (igual ao `room_seats` do catalog). A V1 já tinha sido aplicada com outro nome no banco local; o banco foi recriado antes da troca, então o checksum do Flyway confere.
+- **Mapper usa `Session.restore`:** ler do banco é reconstituir, não registrar uma sessão nova.
+
+### Problemas e soluções
+- Contexto não subia: construtor `private` no `SessionPersistenceAdapter`. Trocado para `public`.
+- ArchUnit falhando: pacote `com.cinema.catalog` no teste copiado. Trocado para `com.cinema.booking`.
+- Testes de integração com "Could not find a valid Docker environment": o Docker Desktop estava fechado.
+
+### Pendências
+- 7.1 (booking): Parte 3 (caso de uso `RegisterSession` com fake), Parte 4 (consumer com inbox, retry e DLQ).
+- Exercício `returnsEmptyForUnknownSession` no `SessionPersistenceAdapterIntegrationTest`.
+- Seção 10: limpeza das linhas publicadas do outbox.
+- Aviso do Mockito sobre carregamento dinâmico de agente: configurar `-javaagent` no surefire.
+- Testes de integração de filmes e salas, se valer a pena.
+- Pendências antigas: asserts extras em `failsWhenRoomNotFound`; renomear `acceptTitleAtMaxLength`; teste de "não encontrado" em `SessionQueryService.get`; UUID v7; nome do `transaction-service`.
