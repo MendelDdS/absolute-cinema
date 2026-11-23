@@ -17,6 +17,6 @@ public abstract class IntegrationTest {
 
     @BeforeEach
     void cleanDatabase() {
-        jdbcTemplate.execute("TRUNCATE TABLE session_seats, sessions");
+        jdbcTemplate.execute("TRUNCATE TABLE processed_events, session_seats, sessions");
     }
 }

@@ -28,6 +28,5 @@ class HexagonalArchitectureTest {
     @ArchTest
     static final ArchRule inboundAdaptersDoNotUseOutboundAdapters = ArchRuleDefinition.noClasses()
             .that().resideInAnyPackage("com.cinema.booking.adapter.in..")
-            .should().dependOnClassesThat().resideInAnyPackage("com.cinema.booking.adapter.out..")
-            .allowEmptyShould(true);
+            .should().dependOnClassesThat().resideInAnyPackage("com.cinema.booking.adapter.out..");
 }
