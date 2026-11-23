@@ -296,7 +296,13 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
   - `SessionJpaEntity` com `@ElementCollection` + `@OrderColumn(name = "seat_order")`, `SessionJpaRepository` com `@EntityGraph` no `findById`, `SessionPersistenceMapper` e `SessionPersistenceAdapter`;
   - testes: classe base `IntegrationTest`, `SessionPersistenceAdapterIntegrationTest` (ordem B1, A1, A2 preservada após ida e volta ao banco) e `HexagonalArchitectureTest` com ArchUnit.
 - 7.1, Parte 3 (caso de uso): `RegisterSessionUseCase` + `RegisterSessionCommand`, `RegisterSessionService` e o fake `InMemorySessionRepository`. Teste escrito antes, visto falhando com o service vazio, depois implementado.
-- 24 testes passando no booking.
+- 7.1, Parte 4a (consumer com inbox):
+  - `SessionScheduledListener` em `adapter/in/kafka`: lê o header `eventId`, marca o evento no inbox e chama o `RegisterSessionUseCase`; o payload chega como `String` e é convertido com `JsonMapper` para `SessionScheduledMessage` (cópia do contrato do catalog, com `toCommand()`);
+  - `V2__create_processed_events.sql` e `ProcessedEventInbox`;
+  - consumer com `group-id: booking-service` e `auto-offset-reset: earliest`;
+  - teste de integração com Kafka real: evento → sessão salva; mesmo evento duas vezes → processado uma vez;
+  - `allowEmptyShould(true)` removido do ArchUnit, porque `adapter.in` já tem classes.
+- 26 testes passando no booking.
 
 ### Conceitos estudados
 - **Proxy CGLIB e construtor visível:** o `@Repository` faz o Spring envolver o bean em um proxy de tradução de exceções. Esse proxy é uma subclasse gerada em tempo de execução e precisa chamar o construtor da classe-mãe; com o construtor `private`, o contexto não sobe ("No visible constructors"). Construtor privado é padrão do domínio; adapter é instanciado pelo Spring e precisa de construtor `public`.
@@ -308,6 +314,11 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
   - No booking os dois corpos ainda são iguais (o ID vem do evento): a separação segue o modelo do catalog, onde a diferença já existe.
 - **Teste visto falhando antes da implementação:** o service começa com o corpo vazio, que compila; os testes falham pelo motivo certo (nada salvo, nenhuma exceção). Isso prova que eles conseguem pegar o erro.
 - **Assento inválido no meio da lista** (`B1`, `a1`, `A2`): prova que um código inválido derruba a sessão inteira, e o `count()` do fake (método só do fake, fora da porta) prova que nada foi salvo.
+- **Entrega "pelo menos uma vez" do Kafka:** o offset é confirmado depois do processamento; se o serviço cair entre salvar e confirmar, a mensagem volta. Por isso o consumer precisa ser idempotente, e o inbox é o que garante isso.
+- **Teste de duplicidade com dados escolhidos de propósito:**
+  - a reentrega tem preço diferente (`99.00`): reenviada igual, o teste passaria mesmo sem inbox, porque o `save` de um ID existente faz `merge` e continua havendo uma sessão só;
+  - não dá para esperar que "nada aconteça", então o teste espera uma terceira mensagem (a sessão marcadora). Com uma partição, quando ela aparece a reentrega já passou pelo listener;
+  - conferido numa cópia sem o inbox: o teste falha com `expected 30.00 but was 99.00`.
 - **ArchUnit com pacote vazio:** uma regra cujo `that()` não encontra nenhuma classe falha ("failed to check any classes"). Foi o que denunciou o teste copiado do catalog ainda apontando para `com.cinema.catalog`.
 
 ### Decisões
@@ -316,6 +327,11 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - **Command com tipos do JDK (`UUID`, `Instant`, `BigDecimal`, `List<String>`):** a conversão para objetos de valor fica só no service, então dado inválido sempre vira `DomainException` no mesmo ponto; o listener (Parte 4) só traduz o formato de transporte. Mesmo padrão do `CreateRoomCommand` do catalog.
 - **`register` retorna `void`:** quem chama é o consumer, que já tem o ID vindo no evento.
 - **Sem checar "sessão já existe" no service:** o catalog publica cada sessão uma vez, com `eventId` único; reentregas trazem o mesmo `eventId` e o inbox da Parte 4 as descarta. Checar com `findById` custaria uma leitura por evento para duplicar essa garantia.
+- **Inbox com `INSERT ... ON CONFLICT (event_id) DO NOTHING` via `JdbcTemplate`:** uma instrução marca o evento e diz se ele é novo (1 linha) ou repetido (0). Em entregas simultâneas, a segunda espera a primeira terminar e não insere nada, sem exceção nem retry. A alternativa JPA (`existsById` + `save`) faria 2 ou 3 consultas e terminaria a corrida em violação de chave e nova tentativa. Custo: SQL específico do Postgres.
+- **Evento marcado antes do processamento, na mesma transação:** se o `register` falhar, o rollback desfaz também a marcação e a nova tentativa reprocessa. O `JdbcTemplate` participa da transação do `JpaTransactionManager` (mesma conexão).
+- **`processed_at` com `DEFAULT now()`:** serve para uma limpeza futura do inbox; um bean `Clock` só para isso seria cedo (ele entra na 7.4).
+- **`auto-offset-reset: earliest`:** com o padrão `latest`, um booking que sobe pela primeira vez ignora as sessões já publicadas, e no teste uma mensagem enviada antes de o consumer ficar pronto se perderia.
+- **Tópico criado pelo teste (`NewTopic` no `TestcontainersConfiguration`), com 1 partição:** em produção quem cria é o catalog, que produz no tópico; o Kafka do compose não cria tópicos sozinho. Uma partição garante a ordem de que o teste de duplicidade depende.
 - **`seatCodes` no command, mesmo nome do campo da mensagem do catalog:** a conversão no listener fica um mapeamento direto, sem tradução de nomes.
 
 ### Problemas e soluções
@@ -324,7 +340,7 @@ Cada dia tem as seções: **Feito**, **Decisões**, **Conceitos estudados**, **P
 - Testes de integração com "Could not find a valid Docker environment": o Docker Desktop estava fechado.
 
 ### Pendências
-- 7.1 (booking): Parte 4 (consumer de `SessionScheduled` com inbox `processed_events`, retry e DLQ).
+- 7.1 (booking): Parte 4b (retry e DLQ `catalog.session.scheduled.dlq`).
 - Exercício `returnsEmptyForUnknownSession` no `SessionPersistenceAdapterIntegrationTest`.
 - Seção 10: limpeza das linhas publicadas do outbox.
 - Aviso do Mockito sobre carregamento dinâmico de agente: configurar `-javaagent` no surefire.
